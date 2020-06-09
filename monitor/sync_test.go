@@ -51,10 +51,21 @@ func TestSync(t *testing.T) {
 		}
 
 	}
+
+	appFs.RemoveAll("fakeDir")
 }
 func TestRead(t *testing.T) {
 	c := content{}
 	if err := c.read(strings.NewReader("This is test string 1.\nThis is test string 2.")); (err != nil) != false {
 		t.Errorf("read() error = %v", err)
 	}
+}
+
+func join(strs ...string) string {
+	var sb strings.Builder
+	for _, str := range strs {
+		sb.WriteString(str)
+		sb.WriteString("\n")
+	}
+	return strings.Trim(sb.String(), "\n")
 }

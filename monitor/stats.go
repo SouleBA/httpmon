@@ -1,5 +1,7 @@
 package monitor
 
+import "math"
+
 type rank map[string]int
 
 type pollStats struct {
@@ -51,7 +53,7 @@ func (t *traffic) sum() uint {
 }
 
 func (t *traffic) hitsAvgRate() float64 {
-	return float64(t.sum()) / float64(t.totalPolls)
+	return math.Ceil(float64(t.sum()) / float64(t.totalPolls))
 }
 
 func (t *traffic) appendEntries(entries uint) {

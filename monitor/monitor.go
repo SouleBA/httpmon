@@ -3,6 +3,7 @@ package monitor
 import (
 	"fmt"
 	"io"
+	"math/bits"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,8 @@ type Launcher struct {
 	pollInterval        uint     // pollInterval represents the file content polling interval
 	statsReportInterval uint
 	alertingInterval    uint
+	maxPoll             uint
+	session             *session
 	isAlert             bool      // specify if we are currently on alert
 	stopCh              chan bool // stopCh is the channel which when closed, will shutdown the launcher
 }
@@ -36,6 +39,8 @@ func NewLauncher(opts ...options) *Launcher {
 		pollInterval:        1,
 		statsReportInterval: 10,
 		alertingInterval:    120,
+		maxPoll:             1<<bits.UintSize - 1,
+		session:             newSession(),
 		isAlert:             false,
 		stopCh:              make(chan bool, 1),
 	}
@@ -61,7 +66,7 @@ func (l *Launcher) Launch(out io.Writer) {
 	pollTicker := time.NewTicker(time.Duration(l.pollInterval) * time.Second)
 	statsTicker := time.NewTicker(time.Duration(l.statsReportInterval) * time.Second)
 
-	session := newSession()
+	//session := newSession()
 
 	polls := uint(0) // counter to check if it is time for an alert
 
@@ -70,14 +75,14 @@ func (l *Launcher) Launch(out io.Writer) {
 		case <-pollTicker.C:
 			polls++ // increment the counter
 			content := content{filePath: l.filePath}
-			err := content.sync(session.getOffset(), session.getFileSize())
+			err := content.sync(l.session.getOffset(), l.session.getFileSize())
 			if err != nil {
 				panic(err)
 			}
 
 			// set offset and filesize for next poll
-			session.updateOffset(content.offset)
-			session.updateFileSize(content.fileSize)
+			l.session.updateOffset(content.offset)
+			l.session.updateFileSize(content.fileSize)
 
 			entries, err := l.parseContent(strings.NewReader(content.fields))
 			if err != nil {
@@ -85,23 +90,27 @@ func (l *Launcher) Launch(out io.Writer) {
 			}
 
 			for _, entry := range entries {
-				session.updateSectionStats(entry.request.section)
-				session.updateStatusStats(entry.statusCode)
-				session.updateProtocolStats(entry.request.protocol)
+				l.session.updateSectionStats(entry.request.section)
+				l.session.updateStatusStats(entry.statusCode)
+				l.session.updateProtocolStats(entry.request.protocol)
 			}
 
 			if len(entries) > 0 {
-				session.updateTotalTraffic(uint(len(entries)))
+				l.session.updateTotalTraffic(uint(len(entries)))
 			}
 
-			session.updateTotalPolls(l.pollInterval)
+			l.session.updateTotalPolls(l.pollInterval)
 
 			if polls%l.alertingInterval == 0 {
-				session.checkAlert(l.treshold)
+				l.session.checkAlert(l.treshold)
+			}
+
+			if polls == l.maxPoll {
+				l.stopCh <- true
 			}
 		case <-statsTicker.C:
-			session.report()
-			session.resetPollStats()
+			l.session.report()
+			l.session.resetPollStats()
 		case <-l.stopCh:
 			fmt.Fprintf(out, "Shut down requested")
 			pollTicker.Stop()
@@ -175,19 +184,10 @@ func (l *Launcher) Shutdown() {
 	l.stopCh <- true
 }
 
-func printErrors(out io.Writer, errors []string) {
+/*func printErrors(out io.Writer, errors []string) {
 	io.WriteString(out, "Woops! We ran into some problem!\n")
 	io.WriteString(out, "launch errors:\n")
 	for _, msg := range errors {
 		io.WriteString(out, "\t"+msg+"\n")
 	}
-}
-
-func join(strs ...string) string {
-	var sb strings.Builder
-	for _, str := range strs {
-		sb.WriteString(str)
-		sb.WriteString("\n")
-	}
-	return strings.Trim(sb.String(), "\n")
-}
+}*/
