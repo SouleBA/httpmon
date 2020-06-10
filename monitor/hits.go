@@ -3,8 +3,8 @@ package monitor
 import "sort"
 
 type hit struct {
-	Key   string
-	Value int
+	key   string
+	value int
 }
 
 type hitList []hit
@@ -21,5 +21,5 @@ func rankByHitCount(hitFrequencies map[string]int) hitList {
 }
 
 func (h hitList) Len() int           { return len(h) }
-func (h hitList) Less(i, j int) bool { return h[i].Value < h[j].Value }
+func (h hitList) Less(i, j int) bool { return h[i].value < h[j].value }
 func (h hitList) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }

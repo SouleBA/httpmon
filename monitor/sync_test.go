@@ -47,7 +47,7 @@ func TestSync(t *testing.T) {
 		}
 
 		if c.offset != tt.expectedOffset {
-			t.Errorf("sync() error = wrong offset: \n\t expected %d \n\t got %d", tt.expectedOffset, c.offset)
+			t.Errorf("TestSync() error = wrong offset: \n\t expected %d \n\t got %d", tt.expectedOffset, c.offset)
 		}
 
 	}
@@ -57,7 +57,7 @@ func TestSync(t *testing.T) {
 func TestRead(t *testing.T) {
 	c := content{}
 	if err := c.read(strings.NewReader("This is test string 1.\nThis is test string 2.")); (err != nil) != false {
-		t.Errorf("read() error = %v", err)
+		t.Errorf("TestRead() error = %v", err)
 	}
 }
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"text/tabwriter"
 
 	"github.com/SouleBA/httpmon/monitor"
 )
@@ -22,8 +23,10 @@ func main() {
 
 	flag.Parse()
 
-	l := monitor.NewLauncher(monitor.SetConfig(filePath, treshold))
-	go l.Launch(os.Stdout)
+	l := monitor.NewLauncher(monitor.DefaultConfig(filePath, treshold))
+	writer := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', tabwriter.AlignRight)
+	writer.Flush()
+	go l.Launch(writer)
 
 	<-sigs
 	l.Shutdown()

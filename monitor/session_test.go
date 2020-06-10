@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"os"
 	"testing"
 )
 
@@ -22,17 +23,17 @@ func TestCheckAlert(t *testing.T) {
 		},
 	}
 
+	s := newSession()
 	for _, tt := range tests {
-		s := newSession()
 		s.traffic = traffic{
 			totalEntries: tt.Traffic,
 			totalPolls:   tt.polls,
 		}
 
-		s.checkAlert(10)
+		s.checkAlert(os.Stdout, 10)
 
 		if s.isAlert != tt.expectedAlert {
-			t.Errorf("checkALert() error = wrong alert: \n\t expected \n%#v \n\t got \n%#v", tt.expectedAlert, s.isAlert)
+			t.Errorf("TestCheckAlert() error = wrong alert: \n\t expected \n%#v \n\t got \n%#v", tt.expectedAlert, s.isAlert)
 		}
 
 	}

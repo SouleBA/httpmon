@@ -16,9 +16,9 @@ func TestRankByHitCount(t *testing.T) {
 				"/pages":  60,
 			},
 			[]hit{
-				hit{"/api", 164},
-				hit{"/pages", 60},
-				hit{"/report", 26},
+				{"/api", 164},
+				{"/pages", 60},
+				{"/report", 26},
 			},
 		},
 		{
@@ -28,9 +28,9 @@ func TestRankByHitCount(t *testing.T) {
 				"/pages":  23,
 			},
 			[]hit{
-				hit{"/report", 43},
-				hit{"/pages", 23},
-				hit{"/api", 4},
+				{"/report", 43},
+				{"/pages", 23},
+				{"/api", 4},
 			},
 		},
 	}
@@ -39,7 +39,7 @@ func TestRankByHitCount(t *testing.T) {
 		hits := rankByHitCount(tt.sectionHitlist)
 		for i, hit := range hits {
 			if hit != tt.expectedHitList[i] {
-				t.Errorf("rankByHitCount() error = wrong order: \n\t expected \n%#v \n\t got \n%#v", tt.expectedHitList[i], hit)
+				t.Errorf("TestRankByHitCount() error: \n\t expected \n%#v \n\t got \n%#v", tt.expectedHitList[i], hit)
 			}
 		}
 

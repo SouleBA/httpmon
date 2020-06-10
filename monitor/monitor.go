@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"math/bits"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/satyrius/gonx"
 )
 
@@ -16,7 +18,7 @@ type Launcher struct {
 	filePath            string   // filePath is the name of the file to monitor
 	treshold            uint     // treshold represents the limit to trigger alerts
 	logFormat           string   // logFormat represents the log formatting
-	logKeys             []string //logKeys represents the formatted fields keys
+	logKeys             []string // logKeys represents the formatted fields keys
 	pollInterval        uint     // pollInterval represents the file content polling interval
 	statsReportInterval uint
 	alertingInterval    uint
@@ -52,8 +54,8 @@ func NewLauncher(opts ...options) *Launcher {
 	return l
 }
 
-// SetConfig is a functional option to configure the Launcher
-func SetConfig(filepath string, treshold uint) options {
+// DefaultConfig is a functional option to configure the Launcher
+func DefaultConfig(filepath string, treshold uint) options {
 	return func(l *Launcher) {
 		l.filePath = filepath
 		l.treshold = treshold
@@ -77,60 +79,62 @@ func (l *Launcher) Launch(out io.Writer) {
 			content := content{filePath: l.filePath}
 			err := content.sync(l.session.getOffset(), l.session.getFileSize())
 			if err != nil {
-				panic(err)
+				fmt.Println(err)
+				os.Exit(1)
 			}
 
 			// set offset and filesize for next poll
 			l.session.updateOffset(content.offset)
 			l.session.updateFileSize(content.fileSize)
 
+			// parse polled content
 			entries, err := l.parseContent(strings.NewReader(content.fields))
 			if err != nil {
-				panic(err)
+				fmt.Println(err)
+				os.Exit(1)
 			}
 
+			// update stats with current polled content
 			for _, entry := range entries {
 				l.session.updateSectionStats(entry.request.section)
 				l.session.updateStatusStats(entry.statusCode)
 				l.session.updateProtocolStats(entry.request.protocol)
 			}
 
+			// only update if there was traffic
 			if len(entries) > 0 {
 				l.session.updateTotalTraffic(uint(len(entries)))
 			}
 
-			l.session.updateTotalPolls(l.pollInterval)
-
-			if polls%l.alertingInterval == 0 {
-				l.session.checkAlert(l.treshold)
+			// If we are on alert and under treshold persit recovery time
+			if l.session.getAlertStatus() && l.session.getTrafficAvg() < l.treshold {
+				l.session.updateRecoveryDate(time.Now())
 			}
 
+			l.session.updateTotalPolls(l.pollInterval)
+
+			// Every alerting Interval
+			if polls%l.alertingInterval == 0 {
+				l.session.checkAlert(out, l.treshold)
+				l.session.resetTraffic()
+			}
+
+			// If maximum polls reached we quit
 			if polls == l.maxPoll {
 				l.stopCh <- true
 			}
 		case <-statsTicker.C:
-			l.session.report()
+			// Report Interval
+			l.session.report(out, 5)
+			// Reset Stats Data
 			l.session.resetPollStats()
 		case <-l.stopCh:
-			fmt.Fprintf(out, "Shut down requested")
+			fmt.Fprintf(out, "Shut down requested\n")
+			fmt.Fprintf(out, "Bye!\n")
 			pollTicker.Stop()
 			statsTicker.Stop()
 			return
-		default:
-
 		}
-		/*
-			program := p.ParseProgram()
-			if len(p.Errors()) != 0 {
-				printParserErrors(out, p.Errors())
-				continue
-			}
-
-			evaluated := evaluator.Eval(program)
-			if evaluated != nil {
-				io.WriteString(out, evaluated.Inspect())
-				io.WriteString(out, "\n")
-			}*/
 	}
 }
 
@@ -143,25 +147,25 @@ func (l *Launcher) parseContent(logReader io.Reader) ([]entry, error) {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "gonx read failed")
 		}
 
 		for _, key := range l.logKeys {
 			field, err := rec.Field(key)
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "gonx could not retrieve a field")
 			}
 			fields[key] = field
 		}
 
 		req, err := NewRequest(fields["request"])
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "could not create a request")
 		}
 
 		responseSize, err := strconv.ParseUint(fields["response_size"], 10, 64)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "Type casting string to uint failed")
 		}
 
 		statusCode := fields["status_code"]
@@ -183,11 +187,3 @@ func (l *Launcher) parseContent(logReader io.Reader) ([]entry, error) {
 func (l *Launcher) Shutdown() {
 	l.stopCh <- true
 }
-
-/*func printErrors(out io.Writer, errors []string) {
-	io.WriteString(out, "Woops! We ran into some problem!\n")
-	io.WriteString(out, "launch errors:\n")
-	for _, msg := range errors {
-		io.WriteString(out, "\t"+msg+"\n")
-	}
-}*/

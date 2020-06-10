@@ -1,13 +1,18 @@
 package monitor
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+	"time"
+)
 
 type session struct {
 	pollStats
 	traffic
-	offset   int64
-	fileSize int64
-	isAlert  bool
+	offset       int64
+	fileSize     int64
+	isAlert      bool
+	recoveryTime time.Time
 }
 
 func newSession() *session {
@@ -21,6 +26,7 @@ func newSession() *session {
 		0,
 		0,
 		false,
+		time.Now(),
 	}
 
 	return s
@@ -32,6 +38,14 @@ func (s *session) resetPollStats() {
 		statusList:   make(map[string]int),
 		protocolList: make(map[string]int),
 	}
+}
+
+func (s *session) resetTraffic() {
+	s.traffic = traffic{}
+}
+
+func (s *session) getAlertStatus() bool {
+	return s.isAlert
 }
 
 func (s *session) updateTotalTraffic(entries uint) {
@@ -70,36 +84,67 @@ func (s *session) getFileSize() int64 {
 	return s.fileSize
 }
 
-func (s *session) checkAlert(treshold uint) {
+func (s *session) updateRecoveryDate(recovery time.Time) {
+	s.recoveryTime = recovery
+}
+
+func (s *session) getTrafficAvg() uint {
+	return uint(s.traffic.hitsAvgRate())
+}
+
+func (s *session) checkAlert(out io.Writer, treshold uint) {
 	tAvg := uint(s.traffic.hitsAvgRate())
 	if !s.isAlert && tAvg > treshold {
 		s.isAlert = true
-		s.notify(tAvg)
+		s.notify(out, tAvg)
 	}
 
 	if s.isAlert && tAvg < treshold {
 		s.isAlert = false
-		s.notify(tAvg)
+		s.notify(out, tAvg)
 	}
 }
 
-func (s *session) notify(tAvg uint) {
+func (s *session) notify(out io.Writer, tAvg uint) {
 	if s.isAlert {
-		fmt.Println("High traffic generated an alert - hits =", tAvg)
+		fmt.Fprintf(out, "High traffic generated an alert - hits = %d\n", tAvg)
+		fmt.Fprintf(out, "\n")
 		return
 	}
 
 	if !s.isAlert {
-		fmt.Println("High traffic recovered - hits =", tAvg)
+		fmt.Fprintf(out, "High traffic recovered at %s - hits = %d\n", s.recoveryTime, tAvg)
+		fmt.Fprintf(out, "\n")
 		return
 	}
 }
 
-func (s *session) report() {
-	fmt.Println(s.traffic.sum())
-	fmt.Println(s.traffic.totalPolls)
-	fmt.Println(s.traffic.hitsAvgRate())
-	fmt.Println(rankByHitCount(s.pollStats.getSectionList()))
-	fmt.Println(rankByHitCount(s.pollStats.getProtocolList()))
-	fmt.Println(rankByHitCount(s.pollStats.getStatusList()))
+func (s *session) report(out io.Writer, n int) {
+	fmt.Fprintln(out, time.Now())
+	fmt.Fprintln(out, "Here is your Interval Stats Report", time.Now())
+	fmt.Fprintf(out, "\n")
+
+	secStats := rankByHitCount(s.pollStats.getSectionList())
+	print("section", secStats, n, out)
+
+	protoStats := rankByHitCount(s.pollStats.getProtocolList())
+	print("protocol", protoStats, n, out)
+
+	statusStats := rankByHitCount(s.pollStats.getStatusList())
+	print("status", statusStats, n, out)
+}
+
+func print(name string, hits hitList, n int, out io.Writer) {
+	if len(hits) == 0 {
+		fmt.Fprintf(out, "No %s hit for this poll interval\n\n", name)
+
+		return
+	} else if n > len(hits) {
+		n = len(hits)
+	}
+	fmt.Fprintf(out, "%s\thits\n", name)
+	for i := 0; i < n; i++ {
+		fmt.Fprintf(out, "%s\t%d\t\n", hits[i].key, hits[i].value)
+	}
+	fmt.Fprint(out, "\n")
 }

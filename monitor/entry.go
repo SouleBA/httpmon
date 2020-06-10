@@ -22,7 +22,7 @@ type request struct {
 func NewRequest(requestString string) (*request, error) {
 	s := strings.Split(requestString, " ")
 	if len(s) != 3 {
-		return nil, errors.New("Wrong input. Was expecting \"method path protocol \"")
+		return nil, errors.New("Wrong input to create a request. Was expecting \"method path protocol \"")
 	}
 
 	var section string

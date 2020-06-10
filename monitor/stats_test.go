@@ -30,7 +30,7 @@ func TestHitsAvgRate(t *testing.T) {
 
 		rate := tr.hitsAvgRate()
 		if rate != tt.expectedHitsAvgRate {
-			t.Errorf("hitsAvgRate() error = wrong rate: \n\t expected \n%#v \n\t got \n%#v", tt.expectedHitsAvgRate, rate)
+			t.Errorf("TestHitsAvgRate error = wrong rate: \n\t expected \n%#v \n\t got \n%#v", tt.expectedHitsAvgRate, rate)
 		}
 
 	}
