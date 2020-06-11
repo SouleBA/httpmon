@@ -107,7 +107,7 @@ func (s *session) checkAlert(out io.Writer, treshold uint) {
 
 func (s *session) notify(out io.Writer, tAvg uint) {
 	if s.isAlert {
-		fmt.Fprintf(out, "High traffic generated an alert - hits = %d\n", tAvg)
+		fmt.Fprintf(out, "High traffic generated an alert - hits = %d triggered at %s\n", tAvg, time.Now())
 		fmt.Fprintf(out, "\n")
 		return
 	}
@@ -121,7 +121,7 @@ func (s *session) notify(out io.Writer, tAvg uint) {
 
 func (s *session) report(out io.Writer, n int) {
 	fmt.Fprintln(out, time.Now())
-	fmt.Fprintln(out, "Here is your Interval Stats Report", time.Now())
+	fmt.Fprintln(out, "Here is your Interval Stats Report")
 	fmt.Fprintf(out, "\n")
 
 	secStats := rankByHitCount(s.pollStats.getSectionList())

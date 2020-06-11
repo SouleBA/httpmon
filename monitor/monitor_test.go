@@ -1,7 +1,7 @@
 package monitor
 
 import (
-	"os"
+	"io/ioutil"
 	"strings"
 	"testing"
 	"time"
@@ -14,12 +14,14 @@ func TestLaunch(t *testing.T) {
 	appFs.MkdirAll("fakeDir", 0755)
 	tests := []struct {
 		input                   []string
+		runtime                 uint
 		expectedSectionHitList  hitList
 		expectedProtocolHitList hitList
 		expectedStatusHitList   hitList
 	}{
 		{
 			[]string{"127.0.0.1 - james [09/May/2018:16:00:39 +0000] \"GET /report HTTP/1.0\" 200 123"},
+			9,
 			[]hit{
 				{"/report", 1},
 			},
@@ -33,6 +35,7 @@ func TestLaunch(t *testing.T) {
 		{
 			[]string{"127.0.0.1 - jill [09/May/2018:16:00:41 +0000] \"GET /api/user HTTP/1.0\" 200 234",
 				"127.0.0.1 - james [09/May/2018:16:00:39 +0000] \"GET /report HTTP/1.0\" 200 123"},
+			9,
 			[]hit{
 				{"/api", 1},
 				{"/report", 1},
@@ -44,9 +47,17 @@ func TestLaunch(t *testing.T) {
 				{"200", 2},
 			},
 		},
+		{
+			[]string{"127.0.0.1 - jill [09/May/2018:16:00:41 +0000] \"GET /api/user HTTP/1.0\" 200 234",
+				"127.0.0.1 - james [09/May/2018:16:00:39 +0000] \"GET /report HTTP/1.0\" 200 123"},
+			11,
+			[]hit{},
+			[]hit{},
+			[]hit{},
+		},
 	}
 
-	setC := func(filepath string, maxPoll uint) options {
+	setC := func(filepath string, maxPoll uint) Options {
 		return func(l *Launcher) {
 			l.filePath = filepath
 			l.maxPoll = maxPoll
@@ -54,7 +65,7 @@ func TestLaunch(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		l := NewLauncher(setC("fakeDir/access.log", 9))
+		l := NewLauncher(setC("fakeDir/access.log", tt.runtime))
 		go func() {
 			timer1 := time.NewTimer(4 * time.Second)
 			for i, in := range tt.input {
@@ -65,7 +76,7 @@ func TestLaunch(t *testing.T) {
 				}
 			}
 		}()
-		l.Launch(os.Stdout)
+		l.Launch(ioutil.Discard)
 
 		sectionHit := rankByHitCount(l.session.pollStats.getSectionList())
 		compareSize(t, "section", sectionHit, tt.expectedSectionHitList)

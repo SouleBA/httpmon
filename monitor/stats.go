@@ -32,7 +32,7 @@ func (p *pollStats) incrementStatusList(key string) {
 }
 
 func increment(r rank, key string) {
-	r[key] += 1
+	r[key]++
 }
 
 func (p *pollStats) getStatusList() rank {

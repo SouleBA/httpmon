@@ -15,24 +15,25 @@ import (
 
 // Launcher holds the needed information in order to monitoring
 type Launcher struct {
-	filePath            string   // filePath is the name of the file to monitor
-	treshold            uint     // treshold represents the limit to trigger alerts
-	logFormat           string   // logFormat represents the log formatting
-	logKeys             []string // logKeys represents the formatted fields keys
-	pollInterval        uint     // pollInterval represents the file content polling interval
-	statsReportInterval uint
-	alertingInterval    uint
-	maxPoll             uint
-	session             *session
+	filePath            string    // filePath is the name of the file to monitor
+	treshold            uint      // treshold represents the limit to trigger alerts
+	logFormat           string    // logFormat represents the log formatting
+	logKeys             []string  // logKeys represents the formatted fields keys
+	pollInterval        uint      // pollInterval represents the file content polling interval
+	statsReportInterval uint      // Traffic stats Reporting Interval
+	alertingInterval    uint      // Traffic hits rate reporting interval
+	maxPoll             uint      // maximum possible polls
+	session             *session  // session holds all data
 	isAlert             bool      // specify if we are currently on alert
 	stopCh              chan bool // stopCh is the channel which when closed, will shutdown the launcher
 }
 
-type options func(*Launcher)
+// Options is a Launcher configuration function
+type Options func(*Launcher)
 
 // NewLauncher returns a configured Launcher
 // opts is variadic and represents funtional options
-func NewLauncher(opts ...options) *Launcher {
+func NewLauncher(opts ...Options) *Launcher {
 	l := &Launcher{
 		filePath:            "/tmp/access.log",
 		treshold:            10,
@@ -47,15 +48,27 @@ func NewLauncher(opts ...options) *Launcher {
 		stopCh:              make(chan bool, 1),
 	}
 
+	// Apply configuration
 	for _, opt := range opts {
 		opt(l)
+	}
+
+	// check consistency
+	if l.statsReportInterval > l.pollInterval {
+		fmt.Println("reporting interval must be higher than polling interval")
+		os.Exit(1)
+	}
+
+	if l.maxPoll > l.pollInterval {
+		fmt.Println("maximum polls must be higher than polling interval")
+		os.Exit(1)
 	}
 
 	return l
 }
 
 // DefaultConfig is a functional option to configure the Launcher
-func DefaultConfig(filepath string, treshold uint) options {
+func DefaultConfig(filepath string, treshold uint) Options {
 	return func(l *Launcher) {
 		l.filePath = filepath
 		l.treshold = treshold
@@ -129,8 +142,7 @@ func (l *Launcher) Launch(out io.Writer) {
 			// Reset Stats Data
 			l.session.resetPollStats()
 		case <-l.stopCh:
-			fmt.Fprintf(out, "Shut down requested\n")
-			fmt.Fprintf(out, "Bye!\n")
+			fmt.Fprintf(out, "Shut down requested\nBye!\n")
 			pollTicker.Stop()
 			statsTicker.Stop()
 			return
@@ -158,7 +170,7 @@ func (l *Launcher) parseContent(logReader io.Reader) ([]entry, error) {
 			fields[key] = field
 		}
 
-		req, err := NewRequest(fields["request"])
+		req, err := newRequest(fields["request"])
 		if err != nil {
 			return nil, errors.Wrap(err, "could not create a request")
 		}

@@ -19,7 +19,7 @@ type request struct {
 	protocol string
 }
 
-func NewRequest(requestString string) (*request, error) {
+func newRequest(requestString string) (*request, error) {
 	s := strings.Split(requestString, " ")
 	if len(s) != 3 {
 		return nil, errors.New("Wrong input to create a request. Was expecting \"method path protocol \"")
