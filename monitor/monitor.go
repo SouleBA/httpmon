@@ -54,12 +54,12 @@ func NewLauncher(opts ...Options) *Launcher {
 	}
 
 	// check consistency
-	if l.statsReportInterval > l.pollInterval {
+	if l.statsReportInterval < l.pollInterval {
 		fmt.Println("reporting interval must be higher than polling interval")
 		os.Exit(1)
 	}
 
-	if l.maxPoll > l.pollInterval {
+	if l.maxPoll < l.pollInterval {
 		fmt.Println("maximum polls must be higher than polling interval")
 		os.Exit(1)
 	}
@@ -80,8 +80,6 @@ func DefaultConfig(filepath string, treshold uint) Options {
 func (l *Launcher) Launch(out io.Writer) {
 	pollTicker := time.NewTicker(time.Duration(l.pollInterval) * time.Second)
 	statsTicker := time.NewTicker(time.Duration(l.statsReportInterval) * time.Second)
-
-	//session := newSession()
 
 	polls := uint(0) // counter to check if it is time for an alert
 
